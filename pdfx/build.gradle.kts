@@ -40,9 +40,16 @@ publishing {
                 url = "https://github.com/useswype/kotlin-pdfx"
                 developers {
                     developer {
-                        name = "Swype Technologies Holding B.V."
+                        name = "Swypex Engineering"
+                        email = "eng@swypex.com"
                         url = "https://github.com/useswype/kotlin-pdfx/graphs/contributors"
+                        organization = "Swypex"
+                        organizationUrl = "https://www.swypex.com"
                     }
+                }
+                organization {
+                    name = "Swypex"
+                    url = "https://www.swypex.com"
                 }
                 scm {
                     connection = "scm:git:https://github.com/useswype/kotlin-pdfx.git"
