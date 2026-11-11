@@ -1,3 +1,6 @@
+[![Maven](https://badges.mvnrepository.com/badge/com.swypex/pdfx/badge.svg?label=Maven&color=green)](https://mvnrepository.com/artifact/com.swypex/pdfx)
+
+
 # Swypex PDFx
 
 A Kotlin/JVM library for creating PDFs easily with sane default values and friendly DSL.
