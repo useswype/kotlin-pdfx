@@ -91,7 +91,11 @@ fun main() {
 
                         table(Rounded(8.pt) + Padding(8.pt)) {
                             header("DATE", "MERCHANT", "CATEGORY", "AMOUNT")
-                            activity.forEach { row(it.date, it.merchant, it.category, it.amount) }
+                            activity.forEachIndexed { index, item ->
+                                val style =
+                                    Background(if (index % 2 == 0) Color.Blue50 else Color.White)
+                                row(style, item.date, item.merchant, item.category, item.amount)
+                            }
                         }
 
                         card(

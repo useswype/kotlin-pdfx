@@ -5,9 +5,15 @@ import com.lowagie.text.pdf.*
 import com.swypex.pdfx.*
 import com.swypex.pdfx.Color
 
+// Retain each resolved fill on the cell so split table fragments keep their row styles.
+internal class RoundedTableCellBackground(val color: Color?) : PdfPCellEvent {
+    override fun cellLayout(cell: PdfPCell, position: Rectangle, canvases: Array<PdfContentByte>) =
+        Unit
+}
+
 // Individual cell borders cannot form one rounded outline around the whole table.
 internal fun tableBackgroundAndBorder(node: TableNode) =
-    PdfPTableEvent { _, widths, heights, headerRows, _, canvases ->
+    PdfPTableEvent { table, widths, heights, _, rowStart, canvases ->
         val left = widths.first().first()
         val right = widths.first().last()
         val top = heights.first()
@@ -17,22 +23,26 @@ internal fun tableBackgroundAndBorder(node: TableNode) =
         val radius = minOf(node.cornerRadius.points, (right - left) / 2, (top - bottom) / 2)
         val background = canvases[PdfPTable.BACKGROUNDCANVAS]
 
-        // Without clipping, the header fill would extend beyond the rounded corners.
-        if (headerRows > 0) {
-            background.saveState()
-            background.roundRectangle(left, bottom, right - left, top - bottom, radius)
-            background.clip()
-            background.newPath()
-            background.setColorFill((node.headerStyle.background ?: Color.Gray100).awt())
-            background.rectangle(
-                left,
-                heights[headerRows.coerceAtMost(heights.lastIndex)],
-                right - left,
-                top - heights[headerRows.coerceAtMost(heights.lastIndex)],
-            )
-            background.fill()
-            background.restoreState()
+        background.saveState()
+        background.roundRectangle(left, bottom, right - left, top - bottom, radius)
+        background.clip()
+        background.newPath()
+        for (rowIndex in 0 until heights.lastIndex) {
+            val cells = table.getRow(rowStart + rowIndex)?.cells ?: continue
+            for (column in cells.indices) {
+                val color =
+                    (cells[column]?.cellEvent as? RoundedTableCellBackground)?.color ?: continue
+                background.setColorFill(color.awt())
+                background.rectangle(
+                    widths[rowIndex][column],
+                    heights[rowIndex + 1],
+                    widths[rowIndex][column + 1] - widths[rowIndex][column],
+                    heights[rowIndex] - heights[rowIndex + 1],
+                )
+                background.fill()
+            }
         }
+        background.restoreState()
 
         val lines = canvases[PdfPTable.LINECANVAS]
         lines.saveState()

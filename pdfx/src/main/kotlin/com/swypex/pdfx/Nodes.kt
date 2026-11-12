@@ -21,22 +21,36 @@ internal data class TextNode(val value: String, val style: StyleValues) : Node
 
 internal data class LinkNode(val value: String, val href: String, val style: StyleValues) : Node
 
-internal data class PageNumberNode(val style: StyleValues, val prefix: String) : Node
+internal data class PageNumberNode(
+    val style: StyleValues,
+    val prefix: String,
+    val includeTotal: Boolean,
+) : Node
 
 internal data class Rule(val color: Color, val thickness: Dimension) : Node
 
 internal data class Space(val height: Dimension) : Node
 
 internal data class ImageNode(
-    val file: File,
+    val file: File?,
+    val bytes: ByteArray?,
     val width: Dimension,
     val height: Dimension,
     val fit: ImageFit,
 ) : Node
 
+internal data class TableRow(
+    val cells: List<String>,
+    val style: StyleValues,
+    val cellStyles: Map<Int, Style> = emptyMap(),
+)
+
 internal data class TableNode(
     val headers: List<String>,
-    val rows: List<List<String>>,
+    val rows: List<TableRow>,
+    val columnWidths: List<Float>?,
+    val columnStyles: Map<Int, Style>,
+    val borders: TableBorders,
     val padding: Insets,
     val border: Border,
     val cornerRadius: Dimension,
@@ -48,5 +62,6 @@ internal data class PageSpec(
     val margin: Insets,
     val nodes: List<Node>,
     val header: List<Node>,
+    val firstPageHeader: List<Node>?,
     val footer: List<Node>,
 )
