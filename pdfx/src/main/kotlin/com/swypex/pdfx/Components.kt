@@ -18,7 +18,15 @@ class DocumentBuilder {
         block: PageBuilder.() -> Unit,
     ) {
         val p = PageBuilder().apply(block)
-        pages += PageSpec(size, margins, p.nodes.toList(), p.headerNodes, p.footerNodes)
+        pages +=
+            PageSpec(
+                size,
+                margins,
+                p.nodes.toList(),
+                p.headerNodes,
+                p.firstPageHeaderNodes,
+                p.footerNodes,
+            )
     }
 }
 
@@ -40,7 +48,11 @@ open class ComponentBuilder internal constructor() {
 
     /** Displays the current document page number in a repeating header or footer. */
     fun pageNumber(style: Style = EmptyStyle, prefix: String = "Page ") {
-        nodes += PageNumberNode(style.resolve(), prefix)
+        nodes += PageNumberNode(style.resolve(), prefix, false)
+    }
+
+    fun pageNumber(style: Style = EmptyStyle, prefix: String = "Page ", includeTotal: Boolean) {
+        nodes += PageNumberNode(style.resolve(), prefix, includeTotal)
     }
 
     fun heading(value: String, level: Int = 1, style: Style = EmptyStyle) {
@@ -72,19 +84,39 @@ open class ComponentBuilder internal constructor() {
     }
 
     fun image(file: File, width: Dimension, height: Dimension, fit: ImageFit = ImageFit.Contain) {
-        nodes += ImageNode(file, width, height, fit)
+        nodes += ImageNode(file, null, width, height, fit)
+    }
+
+    fun image(
+        bytes: ByteArray,
+        width: Dimension,
+        height: Dimension,
+        fit: ImageFit = ImageFit.Contain,
+    ) {
+        nodes += ImageNode(null, bytes.copyOf(), width, height, fit)
     }
 
     fun table(style: Style = EmptyStyle, block: TableBuilder.() -> Unit) {
         val resolved = style.resolve(StyleValues(padding = Insets(8.pt)))
         val table = TableBuilder().apply(block)
-        require(table.headers.isNotEmpty() && table.rows.all { it.size == table.headers.size }) {
+        require(
+            table.headers.isNotEmpty() && table.rows.all { it.cells.size == table.headers.size }
+        ) {
             "Every table row must match the non-empty header"
+        }
+        require(table.columnWidths == null || table.columnWidths!!.size == table.headers.size) {
+            "Column widths must match the number of headers"
+        }
+        require(table.columnStyles.keys.all { it in table.headers.indices }) {
+            "Column style index is out of range"
         }
         nodes +=
             TableNode(
                 table.headers,
                 table.rows.toList(),
+                table.columnWidths,
+                table.columnStyles.toMap(),
+                table.borders,
                 resolved.padding,
                 resolved.border() ?: Border(),
                 resolved.cornerRadius,
@@ -171,11 +203,32 @@ open class ComponentBuilder internal constructor() {
     }
 }
 
+enum class TableBorders {
+    All,
+    Horizontal,
+    None,
+}
+
 @PdfDsl
 class TableBuilder internal constructor() {
     internal var headers: List<String> = emptyList()
     internal var headerStyle: StyleValues = defaultHeaderStyle()
-    internal val rows = mutableListOf<List<String>>()
+    internal val rows = mutableListOf<TableRow>()
+    internal var columnWidths: List<Float>? = null
+    internal val columnStyles = mutableMapOf<Int, Style>()
+    var borders: TableBorders = TableBorders.All
+
+    fun columnStyle(index: Int, style: Style) {
+        require(index >= 0)
+        columnStyles[index] = style
+    }
+
+    fun columnWidths(vararg widths: Float) {
+        require(widths.isNotEmpty() && widths.all { it > 0 && it.isFinite() }) {
+            "Column widths must be finite positive values"
+        }
+        columnWidths = widths.toList()
+    }
 
     fun header(vararg cells: String) {
         headers = cells.toList()
@@ -192,17 +245,31 @@ class TableBuilder internal constructor() {
     }
 
     fun row(vararg cells: String) {
-        rows += cells.toList()
+        rows += TableRow(cells.toList(), StyleValues())
+    }
+
+    fun row(style: Style, vararg cells: String) {
+        rows += TableRow(cells.toList(), style.resolve())
+    }
+
+    fun row(style: Style, cellStyles: Map<Int, Style>, vararg cells: String) {
+        require(cellStyles.keys.all { it in cells.indices })
+        rows += TableRow(cells.toList(), style.resolve(), cellStyles.toMap())
     }
 }
 
 @PdfDsl
 class PageBuilder internal constructor() : ComponentBuilder() {
     internal var headerNodes: List<Node> = emptyList()
+    internal var firstPageHeaderNodes: List<Node>? = null
     internal var footerNodes: List<Node> = emptyList()
 
     fun header(block: ComponentBuilder.() -> Unit) {
         headerNodes = ComponentBuilder().apply(block).nodes.toList()
+    }
+
+    fun firstPageHeader(block: ComponentBuilder.() -> Unit) {
+        firstPageHeaderNodes = ComponentBuilder().apply(block).nodes.toList()
     }
 
     fun footer(marginTop: Dimension = 0.pt, block: ComponentBuilder.() -> Unit) {
